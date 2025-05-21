@@ -8,11 +8,12 @@ import {
   getProductById
 } from '../controllers/product.controllers.js';
 import { verifyToken } from '../middlewares/auth.js';
+import upload from '../middlewares/upload.js';
 
 const router = express.Router();
 
 router.get('/', getProducts);
-router.post('/', verifyToken, addProduct);
+router.post("/", verifyToken, upload.single("imageFile"), addProduct);
 router.get('/:id', getProductById);
 router.put('/:id', verifyToken, updateProduct);
 router.delete('/:id', verifyToken, deleteProduct);
