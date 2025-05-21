@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import Product from "../models/product.model.js";
 import path from "path";
+import fs from "fs";
+import { URL } from "url";
 
 export const getProducts = async (req, res) => {
   try {
@@ -46,25 +48,57 @@ export const deleteProduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
+    const imageUrl = deletedProduct.image;
+    const localHosts = [
+      "http://localhost:5000",
+      "https://merncrudbackend-production-6be6.up.railway.app"
+    ];
+
+    if (imageUrl) {
+      const isLocalImage = localHosts.some((host) => imageUrl.startsWith(host));
+
+      if (isLocalImage) {
+        const parsedUrl = new URL(imageUrl);
+        const filename = path.basename(parsedUrl.pathname); // just the file name
+
+        const imagePath = path.join(process.cwd(), "uploads", filename); // fixed path
+
+        fs.unlink(imagePath, (err) => {
+          if (err) {
+            console.error("Failed to delete image file:", err.message);
+          }
+        });
+      }
+    }
+
     res.json({ message: "Product deleted successfully", deletedProduct });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
+
 export const updateProduct = async (req, res) => {
   try {
-    const { name, price, image } = req.body;
+    const { name, price, imageUrl } = req.body;
     const productId = req.params.id;
-    console.log(productId);
+
+    if (!name || !price) {
+      return res.status(400).json({ message: "Name and price are required" });
+    }
+
+    let imagePath = req.body.image; // fallback if nothing is provided
+
+    if (req.file) {
+      imagePath = `${process.env.VITE_API_BASE_URL}/uploads/${req.file.filename}`;
+    } else if (imageUrl) {
+      imagePath = imageUrl;
+    }
 
     const updatedProduct = await Product.findByIdAndUpdate(
       productId,
-      { name, price, image },
-      {
-        new: true,
-        runValidators: true,
-      }
+      { name, price, image: imagePath },
+      { new: true, runValidators: true }
     );
 
     if (!updatedProduct) {
