@@ -6,8 +6,51 @@ import { URL } from "url";
 
 export const getProducts = async (req, res) => {
   try {
-    const products = await Product.find();
-    res.json(products);
+    const {
+      search,
+      page = 1,
+      limit = 10,
+      sort,
+      minPrice,
+      maxPrice,
+    } = req.query;
+
+    const query = {};
+
+    // Search by name (case-insensitive)
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+
+    // Filter by price range
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
+
+    // Sorting
+    let sortOption = {};
+    if (sort === "price_asc") sortOption.price = 1;
+    else if (sort === "price_desc") sortOption.price = -1;
+    else if (sort === "name_asc") sortOption.name = 1;
+    else if (sort === "name_desc") sortOption.name = -1;
+    else sortOption.createdAt = -1; // Default sort by newest
+
+    // Pagination
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [products, total] = await Promise.all([
+      Product.find(query).sort(sortOption).skip(skip).limit(Number(limit)),
+      Product.countDocuments(query),
+    ]);
+
+    res.json({
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / limit),
+      products,
+    });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
@@ -51,7 +94,7 @@ export const deleteProduct = async (req, res) => {
     const imageUrl = deletedProduct.image;
     const localHosts = [
       "http://localhost:5000",
-      "https://merncrudbackend-production-6be6.up.railway.app"
+      "https://merncrudbackend-production-6be6.up.railway.app",
     ];
 
     if (imageUrl) {
@@ -76,7 +119,6 @@ export const deleteProduct = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
-
 
 export const updateProduct = async (req, res) => {
   try {
